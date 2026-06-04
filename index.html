@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Haji & Umroh Ninja</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevent pull-to-refresh on mobile */
+        }
+        h1, h2, h3, .brand-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+        }
+       
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        .interactive-ui {
+            pointer-events: auto;
+        }
+       
+        .menu-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+
+
+        .btn {
+            background: linear-gradient(to bottom, #f59e0b, #d97706);
+            color: white;
+            border: 4px solid #fffbeb;
+            padding: 12px 32px;
+            font-size: 1.5rem;
+            border-radius: 999px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            transition: transform 0.1s, box-shadow 0.1s;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 10px -3px rgba(0, 0, 0, 0.5);
+        }
+       
+        #instruction-text {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+
+        .life-icon {
+            color: #ef4444;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .life-lost {
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body>
+
+
+    <canvas id="gameCanvas"></canvas>
+
+
+    <!-- UI Overlay for Game Stats -->
+    <div id="ui-layer" class="hidden">
+        <div class="flex justify-between items-start w-full">
+            <div class="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+                <div class="text-white/80 text-sm uppercase tracking-wider font-bold">Skor</div>
+                <div id="scoreDisplay" class="text-white brand-font text-4xl">0</div>
+            </div>
+           
+            <div class="flex flex-col items-end">
+                <div id="livesDisplay" class="flex gap-1 mb-2">
+                    <span class="life-icon brand-font">❤</span>
+                    <span class="life-icon brand-font">❤</span>
+                    <span class="life-icon brand-font">❤</span>
+                </div>
+                <div class="bg-black/40 backdrop-blur-md rounded-xl px-4 py-2 border border-white/20 text-white text-right">
+                    <span class="text-sm opacity-80 font-semibold">Level <span id="levelDisplay">1</span>/3</span>
+                </div>
+            </div>
+        </div>
+       
+        <div class="w-full text-center pb-8">
+            <div id="targetQuestion" class="inline-block bg-emerald-600/90 text-white border-4 border-emerald-400 rounded-3xl px-8 py-4 shadow-2xl brand-font text-2xl md:text-4xl max-w-2xl transform transition-transform duration-300">
+                Target Pertanyaan
+            </div>
+        </div>
+    </div>
+
+
+    <div id="mainMenu" class="menu-overlay interactive-ui">
+        <div class="bg-white/10 p-8 md:p-12 rounded-3xl border border-white/20 shadow-2xl text-center max-w-2xl mx-4">
+            <h1 class="text-5xl md:text-7xl text-yellow-400 mb-4 drop-shadow-lg brand-font tracking-wide">HAJI NINJA</h1>
+            <p class="text-white text-lg md:text-xl mb-8 opacity-90">Iris (Slice) jawaban yang BENAR sesuai target.<br>Hindari jawaban yang SALAH (Bom) agar tidak kehilangan nyawa!</p>
+           
+            <div class="bg-black/30 rounded-xl p-4 mb-8 text-left text-white/80 text-sm md:text-base space-y-2">
+                <p>📖 <b>Materi:</b> Konsep, Syarat, dan Hal yang membatalkan Haji & Umroh.</p>
+                <p>🔪 <b>Cara Main:</b> Geser layar (swipe) untuk memotong objek.</p>
+                <p>⚠️ <b>Aturan:</b> Biarkan jawaban yang salah jatuh. Memotong jawaban salah atau membiarkan jawaban benar jatuh akan mengurangi nyawa.</p>
+            </div>
+           
+            <button id="startBtn" class="btn brand-font">Mulai Bermain</button>
+        </div>
+    </div>
+
+
+    <div id="gameOverMenu" class="menu-overlay interactive-ui hidden">
+        <div class="bg-white/10 p-8 md:p-12 rounded-3xl border border-white/20 shadow-2xl text-center max-w-md mx-4">
+            <h2 id="gameOverTitle" class="text-5xl text-white mb-2 drop-shadow-md brand-font">Permainan Selesai</h2>
+            <p id="gameOverMsg" class="text-emerald-300 text-lg mb-6 font-semibold">Belajar lagi yuk!</p>
+           
+            <div class="bg-black/40 rounded-2xl p-6 mb-8">
+                <p class="text-white/80 uppercase text-sm font-bold tracking-widest mb-1">Skor Akhir</p>
+                <p id="finalScore" class="text-6xl text-yellow-400 brand-font drop-shadow-md">0</p>
+            </div>
+           
+            <button id="restartBtn" class="btn brand-font">Main Lagi</button>
+        </div>
+    </div>
+
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+       
+        let width, height;
+       
+        // UI Elements
+        const uiLayer = document.getElementById('ui-layer');
+        const mainMenu = document.getElementById('mainMenu');
+        const gameOverMenu = document.getElementById('gameOverMenu');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const livesDisplay = document.getElementById('livesDisplay');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const targetQuestion = document.getElementById('targetQuestion');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const gameOverTitle = document.getElementById('gameOverTitle');
+        const gameOverMsg = document.getElementById('gameOverMsg');
+
+
+        // Game Data Based on Provided Text
+        const levelData = [
+            {
+                target: "Iris SYARAT WAJIB Haji!",
+                correct: ["Islam", "Baligh", "Berakal", "Merdeka", "Mampu (Fisik)", "Mampu (Dana)"],
+                wrong: ["Zakat", "Puasa", "Syawal", "Arafah", "Mabit", "Tahallul"]
+            },
+            {
+                target: "Iris yang MEMBATALKAN Haji!",
+                correct: ["Jimak sblm Tahallul", "Tinggalkan Wukuf", "Tdk Tawaf Ifadhah", "Tinggalkan Sa'i"],
+                wrong: ["Potong Kuku", "Pakai Parfum", "Mabit Muzdalifah", "Tdk Lempar Jumrah", "Pakai Pakaian Berjahit"]
+            },
+            {
+                target: "Iris RUKUN & AMALAN Haji!",
+                correct: ["Ihram", "Wukuf di Arafah", "Tawaf Ifadhah", "Sa'i", "Tahallul", "Tertib"],
+                wrong: ["Unta", "Sapi", "Kambing", "Fidyah", "Puasa 3 Hari", "Dam"]
+            }
+        ];
+
+
+        let state = {
+            isPlaying: false,
+            score: 0,
+            lives: 3,
+            currentLevel: 0,
+            itemsSpawnedInLevel: 0,
+            maxItemsPerLevel: 15,
+            frames: 0
+        };
+
+
+        let objects = [];
+        let particles = [];
+        let floatingTexts = [];
+        let bladePath = [];
+        let isSwiping = false;
+
+
+        // Resize Canvas
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+
+        class GameObj {
+            constructor(text, isCorrect) {
+                this.text = text;
+                this.isCorrect = isCorrect;
+               
+                // Adjust radius based on text length to ensure it fits
+                this.radius = Math.max(50, text.length * 4.5);
+               
+                // Spawn at the bottom
+                this.x = Math.random() * (width - this.radius * 2) + this.radius;
+                this.y = height + this.radius + 10;
+               
+                // Physics
+                // Target apex near the upper middle of the screen
+                const timeToApex = 40;
+                this.vy = -12 - Math.random() * 4; // Initial upward velocity
+               
+                // Direct the X velocity towards the center to avoid flying off screen early
+                const centerX = width / 2;
+                const distanceToCenter = centerX - this.x;
+                this.vx = (distanceToCenter / 60) + (Math.random() * 2 - 1);
+               
+                this.gravity = 0.15 + (state.currentLevel * 0.02); // gets slightly faster each level
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+               
+                // Colors
+                if(this.isCorrect) {
+                    this.color1 = '#34d399'; // Emerald
+                    this.color2 = '#059669';
+                } else {
+                    this.color1 = '#f87171'; // Red (Bomb)
+                    this.color2 = '#dc2626';
+                }
+               
+                this.sliced = false;
+                this.active = true;
+            }
+
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+                this.rotation += this.rotationSpeed;
+
+
+                // Mark inactive if it falls way below screen
+                if (this.y > height + this.radius + 50) {
+                    this.active = false;
+                    // Penalty if dropped a correct item
+                    if (this.isCorrect && !this.sliced && state.isPlaying) {
+                        loseLife();
+                        createFloatingText("Terlewat!", this.x, height - 50, '#ef4444');
+                    }
+                }
+            }
+
+
+            draw(ctx) {
+                if(!this.active) return;
+               
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+
+                // Draw Bubble/Object
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+               
+                const grad = ctx.createRadialGradient(-this.radius/3, -this.radius/3, 0, 0, 0, this.radius);
+                if (this.isCorrect) {
+                    grad.addColorStop(0, '#a7f3d0');
+                    grad.addColorStop(1, '#059669');
+                } else {
+                    // Bomb visual for wrong item
+                    grad.addColorStop(0, '#fca5a5');
+                    grad.addColorStop(1, '#991b1b');
+                   
+                    // Spark string for bomb
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.radius);
+                    ctx.quadraticCurveTo(20, -this.radius - 20, 30, -this.radius - 10);
+                    ctx.strokeStyle = '#d1d5db';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+               
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.stroke();
+
+
+                // Add inner circle detail
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius - 8, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+
+                // Text
+                ctx.rotate(-this.rotation); // Keep text upright relative to screen or let it spin. Let's let it spin for difficulty, but upright is easier to read.
+                ctx.rotate(this.rotation * 0.5); // spin slowly
+               
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 16px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+               
+                // Word wrap
+                const words = this.text.split(' ');
+                if (words.length > 1) {
+                    ctx.fillText(words.slice(0, Math.ceil(words.length/2)).join(' '), 0, -10);
+                    ctx.fillText(words.slice(Math.ceil(words.length/2)).join(' '), 0, 12);
+                } else {
+                    ctx.fillText(this.text, 0, 0);
+                }
+
+
+                ctx.restore();
+            }
+        }
+
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.radius = Math.random() * 6 + 2;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.02;
+                this.color = color;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+
+        class FloatingText {
+            constructor(text, x, y, color) {
+                this.text = text;
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.life = 1.0;
+                this.vy = -2;
+            }
+            update() {
+                this.y += this.vy;
+                this.life -= 0.02;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.font = 'bold 24px Fredoka One';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 3;
+                ctx.strokeText(this.text, this.x, this.y);
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+
+        function spawnObject() {
+            if (!state.isPlaying || state.itemsSpawnedInLevel >= state.maxItemsPerLevel) return;
+
+
+            const lvlData = levelData[state.currentLevel];
+           
+            // 60% chance to be correct item, 40% wrong
+            const isCorrect = Math.random() > 0.4;
+            let textArray = isCorrect ? lvlData.correct : lvlData.wrong;
+            let text = textArray[Math.floor(Math.random() * textArray.length)];
+
+
+            objects.push(new GameObj(text, isCorrect));
+            state.itemsSpawnedInLevel++;
+
+
+            // If we've spawned all items, wait for them to clear then next level
+            if (state.itemsSpawnedInLevel >= state.maxItemsPerLevel) {
+                setTimeout(checkLevelComplete, 3000);
+            }
+        }
+
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+
+        function createFloatingText(text, x, y, color) {
+            floatingTexts.push(new FloatingText(text, x, y, color));
+        }
+
+
+        function updateLivesDisplay() {
+            let html = '';
+            for (let i = 0; i < 3; i++) {
+                if (i < state.lives) {
+                    html += '<span class="life-icon brand-font">❤</span>';
+                } else {
+                    html += '<span class="life-icon life-lost brand-font">✖</span>';
+                }
+            }
+            livesDisplay.innerHTML = html;
+        }
+
+
+        function addScore(points) {
+            state.score += points;
+            scoreDisplay.textContent = state.score;
+           
+            // Pulse animation
+            scoreDisplay.classList.add('scale-150', 'text-yellow-400');
+            setTimeout(() => {
+                scoreDisplay.classList.remove('scale-150', 'text-yellow-400');
+            }, 200);
+        }
+
+
+        function loseLife() {
+            state.lives--;
+            updateLivesDisplay();
+           
+            // Flash screen red
+            document.body.style.backgroundColor = '#7f1d1d';
+            setTimeout(() => { document.body.style.backgroundColor = '#0f172a'; }, 100);
+
+
+            if (state.lives <= 0) {
+                endGame(false);
+            }
+        }
+
+
+        function checkLevelComplete() {
+            if (!state.isPlaying) return;
+           
+            // Check if there are still active correct objects
+            const hasActiveObjects = objects.some(o => o.active);
+           
+            if (!hasActiveObjects) {
+                state.currentLevel++;
+                if (state.currentLevel >= levelData.length) {
+                    endGame(true); // Won the game
+                } else {
+                    startLevel(state.currentLevel);
+                }
+            } else {
+                setTimeout(checkLevelComplete, 1000);
+            }
+        }
+
+
+        // Calculate shortest distance from a point to a line segment
+        function distToSegmentSquared(p, v, w) {
+            const l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
+            if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return (p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2;
+        }
+
+
+        function checkSlices() {
+            if (bladePath.length < 2) return;
+           
+            const p1 = bladePath[bladePath.length - 2];
+            const p2 = bladePath[bladePath.length - 1];
+
+
+            objects.forEach(obj => {
+                if (!obj.active || obj.sliced) return;
+
+
+                const distSq = distToSegmentSquared({x: obj.x, y: obj.y}, p1, p2);
+                if (distSq <= obj.radius * obj.radius) {
+                    // Sliced!
+                    obj.sliced = true;
+                    obj.active = false;
+
+
+                    if (obj.isCorrect) {
+                        createExplosion(obj.x, obj.y, '#10b981');
+                        createFloatingText("+10 Benar!", obj.x, obj.y, '#10b981');
+                        addScore(10);
+                    } else {
+                        // Sliced a bomb/wrong item
+                        createExplosion(obj.x, obj.y, '#ef4444');
+                        createFloatingText("SALAH!", obj.x, obj.y, '#ef4444');
+                        loseLife();
+                    }
+                }
+            });
+        }
+
+
+        function addBladePoint(x, y) {
+            bladePath.push({x, y});
+            if (bladePath.length > 10) {
+                bladePath.shift(); // keep trail short
+            }
+            checkSlices();
+        }
+
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if(!state.isPlaying) return;
+            isSwiping = true;
+            bladePath = [];
+            addBladePoint(e.clientX, e.clientY);
+        });
+
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isSwiping || !state.isPlaying) return;
+            addBladePoint(e.clientX, e.clientY);
+        });
+
+
+        window.addEventListener('pointerup', () => {
+            isSwiping = false;
+            // Clear trail gradually in update loop
+        });
+
+
+        function startGame() {
+            state.isPlaying = true;
+            state.score = 0;
+            state.lives = 3;
+            state.currentLevel = 0;
+            scoreDisplay.textContent = '0';
+            updateLivesDisplay();
+           
+            mainMenu.classList.add('hidden');
+            gameOverMenu.classList.add('hidden');
+            uiLayer.classList.remove('hidden');
+           
+            objects = [];
+            particles = [];
+            floatingTexts = [];
+            bladePath = [];
+           
+            startLevel(0);
+            gameLoop();
+        }
+
+
+        function startLevel(levelIndex) {
+            state.itemsSpawnedInLevel = 0;
+            levelDisplay.textContent = (levelIndex + 1);
+           
+            const lvlData = levelData[levelIndex];
+            targetQuestion.textContent = lvlData.target;
+           
+            // Pop in animation for question
+            targetQuestion.classList.add('scale-110');
+            setTimeout(() => {
+                targetQuestion.classList.remove('scale-110');
+            }, 300);
+        }
+
+
+        function endGame(isWin) {
+            state.isPlaying = false;
+            uiLayer.classList.add('hidden');
+            gameOverMenu.classList.remove('hidden');
+            finalScoreDisplay.textContent = state.score;
+           
+            if (isWin) {
+                gameOverTitle.textContent = "Alhamdulillah!";
+                gameOverTitle.classList.replace('text-white', 'text-yellow-400');
+                gameOverMsg.textContent = "Kamu sudah memahami materi Haji & Umroh dengan baik.";
+            } else {
+                gameOverTitle.textContent = "Game Over";
+                gameOverTitle.classList.replace('text-yellow-400', 'text-white');
+                gameOverMsg.textContent = "Ayo pelajari lagi syarat dan rukun Haji/Umroh.";
+            }
+        }
+
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+
+        function gameLoop() {
+            if (!state.isPlaying) return;
+
+
+            // Clear Canvas
+            ctx.clearRect(0, 0, width, height);
+
+
+            // Spawning Logic
+            state.frames++;
+            // Spawn faster as levels progress
+            const spawnRate = Math.max(30, 80 - (state.currentLevel * 20));
+            if (state.frames % spawnRate === 0) {
+                spawnObject();
+            }
+
+
+            // Update & Draw Objects
+            for (let i = objects.length - 1; i >= 0; i--) {
+                let obj = objects[i];
+                obj.update();
+                obj.draw(ctx);
+                if (!obj.active && obj.y > height + 200) {
+                    objects.splice(i, 1);
+                }
+            }
+
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.update();
+                p.draw(ctx);
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+
+            // Floating Texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.update();
+                ft.draw(ctx);
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+
+            // Draw Blade Trail
+            if (bladePath.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(bladePath[0].x, bladePath[0].y);
+                for (let i = 1; i < bladePath.length; i++) {
+                    ctx.lineTo(bladePath[i].x, bladePath[i].y);
+                }
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+               
+                // Outer glow
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.stroke();
+               
+                // Inner core
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+
+                // Fade trail if not swiping
+                if (!isSwiping) {
+                    bladePath.shift();
+                } else if (bladePath.length > 15) {
+                    bladePath.shift();
+                }
+            }
+
+
+            requestAnimationFrame(gameLoop);
+        }
+
+
+    </script>
+</body>
+</html>
